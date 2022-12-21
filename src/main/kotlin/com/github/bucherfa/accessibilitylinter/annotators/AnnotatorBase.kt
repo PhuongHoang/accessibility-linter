@@ -29,15 +29,13 @@ abstract class AnnotatorBase : ExternalAnnotator<CollectedInformation, List<Cust
     override fun collectInformation(file: PsiFile, editor: Editor, hasErrors: Boolean): CollectedInformation? {
         println("Starting...")
         val fileType = getFileExtension(file.name)
-        println(fileType)
-        println(fileTypes)
-        println(fileTypes.contains(fileType))
+        println("File extension $fileType will be matched against list of accepted file types $fileTypes, match result: ${fileTypes.contains(fileType)}")
         if (!fileTypes.contains(fileType)) {
             return null
         }
-        println("filetype done")
+        println("${file.name} will be checked for accessibility issues.")
         val cleanInput = prepareInput(file.text)?: return null
-        println("cleaning done")
+        println("Cleaning is done for the file ${file.name}")
         val linterService = file.project.service<LinterService>()
         return CollectedInformation(
             cleanInput,
@@ -56,7 +54,9 @@ abstract class AnnotatorBase : ExternalAnnotator<CollectedInformation, List<Cust
         )
         var annotations: List<CustomAnnotation> = mutableListOf()
         if (response != null) {
-            val element = response.get()?.element
+            val serviceAnswer = response.get()
+            println("Received a response from accessibility linter: $serviceAnswer")
+            val element = serviceAnswer?.element
             val result = element?.getAsJsonArray("result")
             if (result != null) {
                 annotations = processResult(result)
@@ -68,15 +68,8 @@ abstract class AnnotatorBase : ExternalAnnotator<CollectedInformation, List<Cust
     override fun apply(file: PsiFile, annotationResult: List<CustomAnnotation>?, holder: AnnotationHolder) {
         if (!annotationResult.isNullOrEmpty()) {
             for (annotation in annotationResult) {
-                val adjustedMessage = annotation.message
-                    .replace("<", "&lt;")
-                    .replace(">", "&gt;")
-                val htmlTooltip = "<html><body>" +
-                        "Accessibility Linter: $adjustedMessage " +
-                        "(<a href=\"${annotation.url}\">${annotation.type}</a>)" +
-                        "</body></html>"
                 val message = "Accessibility Linter: ${annotation.message} (${annotation.type})"
-                holder.createAnnotation(HighlightSeverity.WARNING, annotation.range, message, htmlTooltip)
+                holder.newAnnotation(HighlightSeverity.WARNING, message)
             }
         }
         println("... finished")
